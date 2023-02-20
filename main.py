@@ -6,14 +6,14 @@ import pygame
 from pygame import *
 
 pygame.init()
-SIZE = W, H = 1500, 900
+SIZE = W, H = 1000, 900
 screen = display.set_mode(SIZE)
 all_sprites = sprite.Group()
 player_sprite = sprite.Group()
 level_sprites = sprite.Group()
 clock = time.Clock()
-FPS = 20
-GRAVITY = 10
+FPS = 15
+GRAVITY = 5
 
 
 def terminate():
@@ -61,18 +61,26 @@ class Player(sprite.Sprite):
         self.direction = 'R'
         self.status = 'stay'
         self.speed = 10
+        self.jump_power = 20
+        self.vx = 0
+        self.vy = 0
 
     def change_animation(self, anim, x, y):
         if anim == 'idle':
             self.frames = []
             self.cut_sheet(load_image('animation/Idle.png'), 4, 1, x, y)
             self.cur_frame = 0
-            self.image = self.frames[self.cur_frame]
-        if anim == 'walk':
+            self.image = self.frames[self.cur_frame].convert_alpha()
+        elif anim == 'walk':
             self.frames = []
             self.cut_sheet(load_image('animation/Walk.png'), 8, 1, x, y)
             self.cur_frame = 0
-            self.image = self.frames[self.cur_frame]
+            self.image = self.frames[self.cur_frame].convert_alpha()
+        elif anim == 'jump':
+            self.frames = []
+            self.cut_sheet(load_image('animation/Jump.png'), 6, 1, x, y)
+            self.cur_frame = 0
+            self.image = self.frames[self.cur_frame].convert_alpha()
 
     def cut_sheet(self, sheet, cols, rows, x, y):
         self.rect = Rect(x, y, sheet.get_width() // cols,
@@ -85,18 +93,32 @@ class Player(sprite.Sprite):
                 )))
 
     def walk(self):
+        player.status = 'walk'
+        self.vx = self.speed
         self.change_animation('walk', self.rect.x, self.rect.y)
-        if self.direction == 'R':
-            self.rect.x += self.speed
-        elif self.direction == 'L':
-            self.rect.x -= self.speed
+
+    def stay(self):
+        player.status = 'stay'
+        self.vx = 0
+        self.change_animation('idle', self.rect.x, self.rect.y)
+
+    def jump(self):
+        player.status = 'jump'
+        self.vy = self.jump_power
+        self.change_animation('jump', self.rect.x, self.rect.y)
 
     def update(self):
         self.cur_frame = (self.cur_frame + 1) % len(self.frames)
         if self.direction == 'R':
             self.image = self.frames[self.cur_frame]
-        if self.direction == 'L':
+        elif self.direction == 'L':
             self.image = transform.flip(self.frames[self.cur_frame], True, False)
+        if self.status == 'walk' and self.direction == 'R':
+            self.rect.x += self.vx
+        elif self.status == 'walk' and self.direction == 'L':
+            self.rect.x -= self.vx
+        elif self.status == 'jump':
+            self.rect.y -= self.vy
         if not pygame.sprite.spritecollideany(self, level_sprites):
             self.rect.y += GRAVITY
 
@@ -118,16 +140,17 @@ while True:
     for e in event.get():
         if e.type == pygame.QUIT:
             terminate()
-    if keys[K_RIGHT]:
-        player.direction = 'R'
-        player_sprite.update()
-        player.walk()
-    elif keys[K_LEFT]:
-        player.direction = 'L'
-        player_sprite.update()
-        player.walk()
-    else:
-        player.change_animation('idle', player.rect.x, player.rect.y)
+        if e.type == KEYDOWN:
+            if e.key == K_RIGHT:
+                player.direction = 'R'
+                player.walk()
+            elif e.key == K_LEFT:
+                player.direction = 'L'
+                player.walk()
+            if e.key == K_SPACE:
+                player.jump()
+        if e.type == KEYUP:
+            player.stay()
     camera.update(player)
     for sprite in all_sprites:
         camera.apply(sprite)
